@@ -7,7 +7,6 @@ using RestUtility.Serializers;
 
 namespace RestUtility;
 
-/// <inheritdoc />
 /// <summary>
 /// REST API client
 /// </summary>
@@ -81,13 +80,6 @@ public sealed class RestClient : IDisposable
         _serializerPipeline = serializerPipelinePipeline;
         _httpClientHandler = new HttpClientHandler { /* MaxConnectionsPerServer = 256, */ CookieContainer = Cookies };
         _httpClient = CreateHttpClientWithHandlers(_httpClientHandler, handlers);
-        _httpClient.Timeout = Timeout.InfiniteTimeSpan; // Disable the client timeout since we use a timeout per request
-        _httpClient.DefaultRequestHeaders.ConnectionClose = true;
-    }
-
-    public void ConfigureHandler(Action<HttpMessageHandler> handler)
-    {
-        handler.Invoke(_httpClientHandler);
     }
 
     private static HttpClient CreateHttpClientWithHandlers(
@@ -110,7 +102,11 @@ public sealed class RestClient : IDisposable
             httpMessageHandler = delegatingHandler;
         }
 
-        return new HttpClient(httpMessageHandler);
+        return new HttpClient(httpMessageHandler)
+        {
+            Timeout = Timeout.InfiniteTimeSpan, // Disable the client timeout since we use a timeout per request
+            DefaultRequestHeaders = { ConnectionClose = true },
+        };
     }
 
     #region [ GET Requests ]
@@ -688,8 +684,6 @@ public sealed class RestClient : IDisposable
                 data = serializer.Deserialize<T>(messageBody);
         }
 
-        // Populate the response object and deserialize to the specified type if the property dictionary contains
-        // an ISerializer key.
         return new WebResponse<T>
         {
             Version = response.Version,
@@ -705,6 +699,7 @@ public sealed class RestClient : IDisposable
     {
         _httpClient.Dispose();
         _httpClientHandler.Dispose();
+        _cancellationTokenSource.Cancel();
         _cancellationTokenSource.Dispose();
     }
 }
